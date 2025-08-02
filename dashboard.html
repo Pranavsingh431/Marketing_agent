@@ -1,0 +1,1558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Marketing Agent Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .card-hover:hover { transform: translateY(-2px); transition: all 0.3s ease; }
+        .status-green { background: linear-gradient(135deg, #10b981, #059669); }
+        .status-yellow { background: linear-gradient(135deg, #f59e0b, #d97706); }
+        .status-red { background: linear-gradient(135deg, #ef4444, #dc2626); }
+        .pulse { animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+        
+        /* Mobile Optimizations */
+        @media (max-width: 768px) {
+            .container { padding-left: 1rem; padding-right: 1rem; }
+            .grid { gap: 1rem; }
+            .text-3xl { font-size: 1.5rem; }
+            .text-2xl { font-size: 1.25rem; }
+            .p-6 { padding: 1rem; }
+            .p-4 { padding: 0.75rem; }
+            .mb-8 { margin-bottom: 1.5rem; }
+            .mb-6 { margin-bottom: 1rem; }
+            
+            /* Mobile-specific layouts */
+            .mobile-stack { display: flex; flex-direction: column; gap: 0.5rem; }
+            .mobile-full { grid-column: 1 / -1; }
+            .mobile-scroll { overflow-x: auto; white-space: nowrap; }
+            .mobile-touch { min-height: 44px; /* Apple's recommended touch target */ }
+            
+            /* Hide/show mobile elements */
+            .hidden-mobile { display: none; }
+            .mobile-only { display: block; }
+            
+            /* Better mobile forms */
+            input, select, textarea { font-size: 16px; /* Prevents zoom on iOS */ }
+            .mobile-form-group { margin-bottom: 1rem; }
+            
+            /* Mobile charts */
+            canvas { max-height: 200px; }
+        }
+        
+        @media (min-width: 769px) {
+            .mobile-only { display: none; }
+        }
+        
+        /* Touch-friendly improvements */
+        .touch-target {
+            min-height: 44px;
+            min-width: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .mobile-card {
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            margin-bottom: 0.75rem;
+        }
+        
+        /* Swipe gestures for mobile */
+        .swipeable {
+            touch-action: pan-x;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Header -->
+    <header class="gradient-bg text-white shadow-lg">
+        <div class="container mx-auto px-4 md:px-6 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-2 md:space-x-4">
+                    <div class="w-8 h-8 md:w-10 md:h-10 bg-white rounded-lg flex items-center justify-center">
+                        <span class="text-xl md:text-2xl">🤖</span>
+                    </div>
+                    <div>
+                        <h1 class="text-xl md:text-2xl font-bold">Marketing Agent</h1>
+                        <p class="text-indigo-200 text-xs md:text-sm hidden-mobile">AI-Powered Campaign Automation</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-2 md:space-x-4">
+                    <div class="bg-white bg-opacity-20 px-2 md:px-4 py-2 rounded-lg">
+                        <span id="system-status" class="text-xs md:text-sm font-medium">🟢 ONLINE</span>
+                    </div>
+                    <button onclick="exportReports()" class="bg-white bg-opacity-20 px-2 md:px-4 py-2 rounded-lg hover:bg-opacity-30 transition-all touch-target" title="Export Reports">
+                        <span class="text-xs md:text-sm">📊</span>
+                        <span class="hidden-mobile ml-1">Export</span>
+                    </button>
+                    <button onclick="refreshDashboard()" class="bg-white bg-opacity-20 px-2 md:px-4 py-2 rounded-lg hover:bg-opacity-30 transition-all touch-target">
+                        <span id="refresh-btn" class="text-xs md:text-sm">🔄</span>
+                        <span class="hidden-mobile ml-1">Refresh</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container mx-auto px-6 py-8">
+        <!-- System Overview Cards -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6 mb-6 md:mb-8">
+            <div class="bg-white rounded-xl shadow-lg p-6 card-hover">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm font-medium">Active Campaigns</p>
+                        <p id="active-campaigns" class="text-3xl font-bold text-gray-900">-</p>
+                    </div>
+                    <div class="bg-blue-100 p-3 rounded-lg">
+                        <span class="text-2xl">🚀</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-xl shadow-lg p-6 card-hover">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm font-medium">Total Spend</p>
+                        <p id="total-spend" class="text-3xl font-bold text-gray-900">-</p>
+                    </div>
+                    <div class="bg-green-100 p-3 rounded-lg">
+                        <span class="text-2xl">💰</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-xl shadow-lg p-6 card-hover">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm font-medium">Avg CTR</p>
+                        <p id="avg-ctr" class="text-3xl font-bold text-gray-900">-</p>
+                    </div>
+                    <div class="bg-purple-100 p-3 rounded-lg">
+                        <span class="text-2xl">📊</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-xl shadow-lg p-6 card-hover">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm font-medium">Total ROAS</p>
+                        <p id="total-roas" class="text-3xl font-bold text-gray-900">-</p>
+                    </div>
+                    <div class="bg-yellow-100 p-3 rounded-lg">
+                        <span class="text-2xl">📈</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts and Campaign List -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Enhanced Performance Charts -->
+            <div class="lg:col-span-2 bg-white rounded-xl shadow-lg p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-xl font-semibold text-gray-900">📊 Live Performance Dashboard</h3>
+                    <span id="last-update" class="text-sm text-gray-500">Updated: Never</span>
+                </div>
+                
+                <!-- Live Metrics Row -->
+                <div class="grid grid-cols-3 gap-4 mb-6">
+                    <div class="bg-blue-50 p-4 rounded-lg text-center">
+                        <div id="live-ctr" class="text-3xl font-bold text-blue-600">0.00%</div>
+                        <div class="text-sm text-gray-600">Average CTR</div>
+                        <div class="text-xs text-gray-500 mt-1">Click-through Rate</div>
+                    </div>
+                    <div class="bg-green-50 p-4 rounded-lg text-center">
+                        <div id="live-cpc" class="text-3xl font-bold text-green-600">$0.00</div>
+                        <div class="text-sm text-gray-600">Average CPC</div>
+                        <div class="text-xs text-gray-500 mt-1">Cost per Click</div>
+                    </div>
+                    <div class="bg-purple-50 p-4 rounded-lg text-center">
+                        <div id="live-roas" class="text-3xl font-bold text-purple-600">0.00x</div>
+                        <div class="text-sm text-gray-600">Average ROAS</div>
+                        <div class="text-xs text-gray-500 mt-1">Return on Ad Spend</div>
+                    </div>
+                </div>
+                
+                <!-- Charts -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <div>
+                        <h4 class="text-sm font-medium text-gray-700 mb-2">Performance Trends</h4>
+                        <canvas id="trendsChart" height="200"></canvas>
+                    </div>
+                    <div>
+                        <h4 class="text-sm font-medium text-gray-700 mb-2">Metrics Distribution</h4>
+                        <canvas id="liveMetricsChart" height="200"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Active Campaigns -->
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-xl font-semibold text-gray-900">Active Campaigns</h3>
+                    <button onclick="exportCampaigns()" class="bg-blue-500 text-white px-3 py-2 rounded-lg hover:bg-blue-600 transition-all text-sm touch-target" title="Export Campaigns">
+                        📊 Export
+                    </button>
+                </div>
+                <div id="campaigns-list" class="space-y-4">
+                    <!-- Campaigns will be populated here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Campaign Templates -->
+        <div class="mt-6 md:mt-8 bg-white rounded-xl shadow-lg p-4 md:p-6">
+            <h3 class="text-lg md:text-xl font-semibold text-gray-900 mb-4 md:mb-6">⚡ Quick Start Templates</h3>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4 mb-4 md:mb-6">
+                <div class="template-card p-3 md:p-4 border border-gray-200 rounded-lg hover:border-blue-500 hover:shadow-md transition-all cursor-pointer touch-target" onclick="applyTemplate('ecommerce')">
+                    <div class="text-center">
+                        <div class="text-2xl md:text-3xl mb-2">🛍️</div>
+                        <h4 class="font-semibold text-gray-900 text-sm md:text-base">E-commerce Product</h4>
+                        <p class="text-xs md:text-sm text-gray-600 mt-1 md:mt-2">Physical products, gadgets, fashion items</p>
+                    </div>
+                </div>
+                <div class="template-card p-4 border border-gray-200 rounded-lg hover:border-blue-500 hover:shadow-md transition-all cursor-pointer" onclick="applyTemplate('saas')">
+                    <div class="text-center">
+                        <div class="text-3xl mb-2">💻</div>
+                        <h4 class="font-semibold text-gray-900">SaaS / Software</h4>
+                        <p class="text-sm text-gray-600 mt-2">Apps, platforms, digital tools</p>
+                    </div>
+                </div>
+                <div class="template-card p-4 border border-gray-200 rounded-lg hover:border-blue-500 hover:shadow-md transition-all cursor-pointer" onclick="applyTemplate('service')">
+                    <div class="text-center">
+                        <div class="text-3xl mb-2">🏢</div>
+                        <h4 class="font-semibold text-gray-900">Services</h4>
+                        <p class="text-sm text-gray-600 mt-2">Consulting, coaching, agencies</p>
+                    </div>
+                </div>
+            </div>
+            <div class="text-center text-sm text-gray-500 mb-6">Click a template to auto-fill the form with optimized settings ↓</div>
+        </div>
+
+        <!-- Campaign Creation Form -->
+        <div class="mt-8 bg-white rounded-xl shadow-lg p-6">
+            <h3 class="text-xl font-semibold text-gray-900 mb-6">🚀 Create New Campaign</h3>
+            
+            <form id="campaign-form">
+            <!-- Campaign Basic Info -->
+            <div class="mb-6">
+                <h4 class="text-lg font-medium text-gray-800 mb-4">📋 Campaign Details</h4>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Campaign Name *</label>
+                        <input type="text" id="campaign-name" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Summer Sale Campaign">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Platform *</label>
+                        <select id="platform" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <option value="meta">Meta (Facebook/Instagram)</option>
+                            <option value="google">Google Ads</option>
+                            <option value="both">Both Platforms</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Daily Budget ($) *</label>
+                        <input type="number" id="daily-budget" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="100" min="1">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Product Information -->
+            <div class="mb-6 p-4 bg-blue-50 rounded-lg">
+                <h4 class="text-lg font-medium text-gray-800 mb-4">🛍️ Product Information</h4>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Product Name *</label>
+                        <input type="text" id="product-name" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Wireless Bluetooth Headphones">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Product Category</label>
+                        <select id="product-category" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <option value="">Select Category</option>
+                            <option value="electronics">Electronics</option>
+                            <option value="fashion">Fashion & Apparel</option>
+                            <option value="beauty">Beauty & Cosmetics</option>
+                            <option value="home">Home & Garden</option>
+                            <option value="sports">Sports & Fitness</option>
+                            <option value="automotive">Automotive</option>
+                            <option value="food">Food & Beverage</option>
+                            <option value="software">Software & Apps</option>
+                            <option value="services">Services</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Product Description *</label>
+                    <textarea id="product-description" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Describe your product in detail. What is it? What does it do? What makes it special?"></textarea>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Key Features (one per line)</label>
+                    <textarea id="product-features" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="40-hour battery life&#10;Noise cancellation&#10;Premium sound quality&#10;Comfortable design"></textarea>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Price/Value</label>
+                        <input type="text" id="product-price" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="$99.99 or Starting from $50">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Landing Page URL</label>
+                        <input type="url" id="landing-url" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="https://yourstore.com/product">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Target Audience -->
+            <div class="mb-6 p-4 bg-green-50 rounded-lg">
+                <h4 class="text-lg font-medium text-gray-800 mb-4">🎯 Target Audience</h4>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Age Range</label>
+                        <select id="target-age" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <option value="18-24">18-24</option>
+                            <option value="25-34" selected>25-34</option>
+                            <option value="35-44">35-44</option>
+                            <option value="45-54">45-54</option>
+                            <option value="55-64">55-64</option>
+                            <option value="65+">65+</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Gender</label>
+                        <select id="target-gender" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <option value="all" selected>All</option>
+                            <option value="male">Male</option>
+                            <option value="female">Female</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Income Level</label>
+                        <select id="target-income" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <option value="">Any</option>
+                            <option value="budget">Budget-conscious</option>
+                            <option value="middle" selected>Middle-class</option>
+                            <option value="premium">Premium/Luxury</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Interests & Hobbies</label>
+                    <input type="text" id="target-interests" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="music, fitness, technology, travel">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Target Customer Description</label>
+                    <textarea id="target-description" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Young professionals who work from home and value quality audio for both work calls and music"></textarea>
+                </div>
+            </div>
+
+            <!-- Marketing Strategy -->
+            <div class="mb-6 p-4 bg-purple-50 rounded-lg">
+                <h4 class="text-lg font-medium text-gray-800 mb-4">💡 Marketing Strategy</h4>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Campaign Objective</label>
+                        <select id="objective" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <option value="conversions" selected>Conversions (Sales)</option>
+                            <option value="traffic">Traffic (Website Visits)</option>
+                            <option value="awareness">Awareness (Brand Recognition)</option>
+                            <option value="engagement">Engagement (Likes, Shares)</option>
+                            <option value="leads">Lead Generation</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Brand Tone</label>
+                        <select id="brand-tone" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <option value="professional">Professional</option>
+                            <option value="friendly" selected>Friendly & Approachable</option>
+                            <option value="luxury">Luxury & Sophisticated</option>
+                            <option value="playful">Fun & Playful</option>
+                            <option value="urgent">Urgent & Action-oriented</option>
+                            <option value="educational">Educational & Helpful</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Unique Selling Points</label>
+                    <textarea id="selling-points" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="What makes your product better than competitors? Special offers, guarantees, etc."></textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Special Offers/Promotions</label>
+                    <input type="text" id="special-offers" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="20% off, Free shipping, Limited time offer">
+                </div>
+            </div>
+
+            <div class="flex justify-center">
+                <button type="submit" class="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-8 py-3 rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all font-medium text-lg">
+                    🚀 Create AI-Powered Campaign
+                </button>
+            </div>
+            </form>
+        </div>
+
+        <!-- System Logs -->
+        <div class="mt-8 bg-white rounded-xl shadow-lg p-6">
+            <h3 class="text-xl font-semibold text-gray-900 mb-4">📋 System Activity</h3>
+            <div id="system-logs" class="bg-gray-50 rounded-lg p-4 h-64 overflow-y-auto font-mono text-sm">
+                <div class="text-green-600">[2024-01-20 10:30:00] ✅ System started successfully</div>
+                <div class="text-blue-600">[2024-01-20 10:30:01] 🔗 Connected to Supabase database</div>
+                <div class="text-blue-600">[2024-01-20 10:30:02] 🤖 OpenRouter API connection verified</div>
+                <div class="text-gray-600">[2024-01-20 10:30:03] 📊 Awaiting campaign creation...</div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Image Modal -->
+    <div id="imageModal" class="hidden fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center p-4" onclick="handleModalClick(event)">
+        <div class="relative max-w-4xl max-h-full">
+            <!-- Close button -->
+            <button onclick="closeImageModal()" class="absolute -top-12 right-0 text-white hover:text-gray-300 text-2xl font-bold z-10">
+                ✕ Close
+            </button>
+            
+            <!-- Image container -->
+            <div class="bg-white p-4 rounded-lg shadow-2xl">
+                <h3 id="modalTitle" class="text-lg font-semibold text-gray-900 mb-4 text-center">AI Generated Image</h3>
+                <img id="modalImage" src="" alt="Full size AI generated image" class="max-w-full max-h-96 object-contain rounded-lg mx-auto">
+                
+                <!-- Action buttons -->
+                <div class="mt-4 flex justify-center space-x-4">
+                    <button onclick="window.open(document.getElementById('modalImage').src, '_blank')" 
+                            class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-all">
+                        🔗 Open in New Tab
+                    </button>
+                    <button onclick="closeImageModal()" 
+                            class="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-all">
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let performanceChart = null;
+        const API_BASE = 'http://localhost:8080';
+
+        // Chart variables for real-time updates
+        let liveMetricsChart = null;
+        let trendsChart = null;
+        let metricsHistory = { labels: [], ctr: [], cpc: [], roas: [] };
+
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 Initializing dashboard...');
+            
+            // First, make sure we can load the basic dashboard
+            refreshDashboard();
+            
+            // Then initialize other features
+            try {
+                initializeChart();
+                initializeLiveCharts();
+                setupEventListeners();
+                startLiveMetricsUpdater();
+            } catch (error) {
+                console.error('Error initializing features:', error);
+            }
+            
+            // Auto-refresh every 30 seconds
+            setInterval(() => {
+                console.log('⏰ Auto-refreshing dashboard...');
+                refreshDashboard();
+            }, 30000);
+            
+            console.log('✅ Dashboard initialization complete');
+        });
+
+        // Initialize live performance charts
+        function initializeLiveCharts() {
+            try {
+                // Live metrics doughnut chart
+                const ctx1 = document.getElementById('liveMetricsChart').getContext('2d');
+                liveMetricsChart = new Chart(ctx1, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['CTR Performance', 'CPC Efficiency', 'ROAS Success'],
+                        datasets: [{
+                            data: [33, 33, 34],
+                            backgroundColor: ['#3b82f6', '#10b981', '#8b5cf6'],
+                            borderWidth: 2,
+                            borderColor: '#ffffff'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'bottom', labels: { usePointStyle: true, fontSize: 12 } }
+                        }
+                    }
+                });
+
+                // Trends line chart
+                const ctx2 = document.getElementById('trendsChart').getContext('2d');
+                trendsChart = new Chart(ctx2, {
+                    type: 'line',
+                    data: {
+                        labels: [],
+                        datasets: [{
+                            label: 'CTR %',
+                            data: [],
+                            borderColor: '#3b82f6',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            tension: 0.4,
+                            fill: true
+                        }, {
+                            label: 'ROAS',
+                            data: [],
+                            borderColor: '#8b5cf6',
+                            backgroundColor: 'rgba(139, 92, 246, 0.1)',
+                            tension: 0.4,
+                            fill: false
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: { intersect: false },
+                        scales: {
+                            x: { display: true },
+                            y: { display: true, title: { display: true, text: 'CTR %' } }
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('Error initializing live charts:', error);
+            }
+        }
+
+        // Start live metrics updater
+        function startLiveMetricsUpdater() {
+            updateLiveMetrics(); // Initial update
+            setInterval(updateLiveMetrics, 30000); // Update every 30 seconds
+        }
+
+        // Update live metrics
+        async function updateLiveMetrics() {
+            try {
+                const response = await fetch('/dashboard');
+                const data = await response.json();
+                
+                let totalCtr = 0, totalCpc = 0, totalRoas = 0;
+                const activeCampaigns = data.active_campaigns || [];
+                
+                if (activeCampaigns.length > 0) {
+                    activeCampaigns.forEach(campaign => {
+                        const performance = campaign.performance_data || {};
+                        totalCtr += performance.ctr || 0;
+                        totalCpc += performance.cpc || 0;
+                        totalRoas += performance.roas || 0;
+                    });
+                    
+                    const avgCtr = (totalCtr / activeCampaigns.length) * 100;
+                    const avgCpc = totalCpc / activeCampaigns.length;
+                    const avgRoas = totalRoas / activeCampaigns.length;
+                    
+                    // Update live display
+                    document.getElementById('live-ctr').textContent = avgCtr.toFixed(2) + '%';
+                    document.getElementById('live-cpc').textContent = '$' + avgCpc.toFixed(2);
+                    document.getElementById('live-roas').textContent = avgRoas.toFixed(2) + 'x';
+                    
+                    // Update charts
+                    updateChartsData(avgCtr, avgCpc, avgRoas);
+                }
+                
+                document.getElementById('last-update').textContent = 'Updated: ' + new Date().toLocaleTimeString();
+                
+            } catch (error) {
+                console.error('Error updating live metrics:', error);
+            }
+        }
+
+        // Update charts with new data
+        function updateChartsData(ctr, cpc, roas) {
+            if (!liveMetricsChart || !trendsChart) return;
+            
+            // Update doughnut chart
+            const ctrPercent = Math.min(ctr * 10, 100);
+            const cpcEfficiency = Math.max(100 - (cpc * 10), 0);
+            const roasPercent = Math.min(roas * 20, 100);
+            
+            liveMetricsChart.data.datasets[0].data = [ctrPercent, cpcEfficiency, roasPercent];
+            liveMetricsChart.update('none');
+            
+            // Update trends chart
+            const currentTime = new Date().toLocaleTimeString();
+            metricsHistory.labels.push(currentTime);
+            metricsHistory.ctr.push(ctr);
+            metricsHistory.roas.push(roas);
+            
+            if (metricsHistory.labels.length > 20) {
+                metricsHistory.labels.shift();
+                metricsHistory.ctr.shift();
+                metricsHistory.roas.shift();
+            }
+            
+            trendsChart.data.labels = metricsHistory.labels;
+            trendsChart.data.datasets[0].data = metricsHistory.ctr;
+            trendsChart.data.datasets[1].data = metricsHistory.roas;
+            trendsChart.update('none');
+        }
+
+        // Campaign Templates
+        const campaignTemplates = {
+            ecommerce: {
+                category: 'electronics',
+                brandTone: 'friendly',
+                objective: 'conversions',
+                audience: { age: '25-44', gender: 'all', income: 'middle' },
+                features: 'High quality materials\nFast shipping\nMoney-back guarantee\nEasy returns',
+                sellingPoints: 'Premium quality at affordable price, trusted by thousands of customers',
+                offers: '20% off first order + free shipping',
+                description: 'High-quality product designed for everyday use with premium materials and attention to detail',
+                sampleNames: ['Premium Wireless Headphones', 'Smart Fitness Tracker', 'Professional Camera Lens']
+            },
+            saas: {
+                category: 'business',
+                brandTone: 'professional',
+                objective: 'lead_generation',
+                audience: { age: '25-54', gender: 'all', income: 'middle' },
+                features: 'Cloud-based platform\nReal-time analytics\n24/7 customer support\nAPI integration',
+                sellingPoints: 'Boost productivity, save time, increase ROI with our proven platform',
+                offers: '14-day free trial + 50% off first 3 months',
+                description: 'Powerful software solution that streamlines your workflow and increases team productivity',
+                sampleNames: ['ProjectFlow Pro', 'Analytics Dashboard Suite', 'CRM Automation Platform']
+            },
+            service: {
+                category: 'business',
+                brandTone: 'professional',
+                objective: 'lead_generation',
+                audience: { age: '30-54', gender: 'all', income: 'premium' },
+                features: 'Expert consultation\nCustom strategy\nOngoing support\nProven results',
+                sellingPoints: 'Industry experts with 10+ years experience, guaranteed results',
+                offers: 'Free consultation + 25% off first project',
+                description: 'Professional service that delivers measurable results and exceeds client expectations',
+                sampleNames: ['Digital Marketing Consulting', 'Business Growth Coaching', 'Web Design Agency']
+            }
+        };
+
+        function applyTemplate(templateType) {
+            const template = campaignTemplates[templateType];
+            if (!template) return;
+
+            // Auto-fill form fields
+            document.getElementById('product-category').value = template.category;
+            document.getElementById('brand-tone').value = template.brandTone;
+            document.getElementById('objective').value = template.objective;
+            document.getElementById('target-age').value = template.audience.age;
+            document.getElementById('target-gender').value = template.audience.gender;
+            document.getElementById('target-income').value = template.audience.income;
+            document.getElementById('product-features').value = template.features;
+            document.getElementById('selling-points').value = template.sellingPoints;
+            document.getElementById('special-offers').value = template.offers;
+            document.getElementById('product-description').value = template.description;
+
+            // Suggest a campaign name
+            const randomName = template.sampleNames[Math.floor(Math.random() * template.sampleNames.length)];
+            document.getElementById('campaign-name').value = `${randomName} Campaign`;
+            document.getElementById('product-name').value = randomName;
+
+            // Visual feedback
+            document.querySelectorAll('.template-card').forEach(card => {
+                card.classList.remove('border-blue-500', 'bg-blue-50');
+            });
+            event.target.closest('.template-card').classList.add('border-blue-500', 'bg-blue-50');
+
+            // Scroll to form
+            document.getElementById('campaign-form').scrollIntoView({ behavior: 'smooth' });
+            
+            // Show success message
+            showNotification(`✅ ${templateType.toUpperCase()} template applied! Review and customize the settings below.`, 'success');
+        }
+
+        // Enhanced Error Handling and Notifications
+        function showNotification(message, type = 'info', duration = 5000) {
+            const notificationContainer = document.getElementById('notification-container') || createNotificationContainer();
+            const notification = document.createElement('div');
+            
+            const typeStyles = {
+                success: 'bg-green-100 border-green-500 text-green-700',
+                error: 'bg-red-100 border-red-500 text-red-700',
+                warning: 'bg-yellow-100 border-yellow-500 text-yellow-700',
+                info: 'bg-blue-100 border-blue-500 text-blue-700'
+            };
+            
+            const icons = {
+                success: '✅',
+                error: '❌',
+                warning: '⚠️',
+                info: 'ℹ️'
+            };
+            
+            notification.className = `fixed top-4 right-4 z-50 p-4 rounded-lg border-l-4 shadow-lg max-w-md transform transition-all duration-300 translate-x-full ${typeStyles[type]}`;
+            notification.innerHTML = `
+                <div class="flex items-start">
+                    <span class="text-lg mr-3 flex-shrink-0">${icons[type]}</span>
+                    <div class="flex-1">
+                        <p class="font-medium">${message}</p>
+                        ${type === 'error' ? '<p class="text-sm mt-1 opacity-75">Please try again or contact support if the issue persists.</p>' : ''}
+                    </div>
+                    <button onclick="this.parentElement.parentElement.remove()" class="ml-3 text-lg hover:opacity-70 touch-target">×</button>
+                </div>
+            `;
+            
+            notificationContainer.appendChild(notification);
+            
+            // Animate in
+            setTimeout(() => notification.classList.remove('translate-x-full'), 100);
+            
+            // Auto remove
+            setTimeout(() => {
+                notification.classList.add('translate-x-full');
+                setTimeout(() => notification.remove(), 300);
+            }, duration);
+        }
+        
+        function createNotificationContainer() {
+            const container = document.createElement('div');
+            container.id = 'notification-container';
+            container.className = 'fixed top-0 right-0 z-50 p-4 space-y-2';
+            document.body.appendChild(container);
+            return container;
+        }
+        
+        // Enhanced error handling for API calls
+        async function apiCall(url, options = {}) {
+            try {
+                const response = await fetch(url, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...options.headers
+                    },
+                    ...options
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => null);
+                    throw new APIError(response.status, errorData?.detail || response.statusText, errorData);
+                }
+                
+                return await response.json();
+            } catch (error) {
+                if (error instanceof APIError) {
+                    throw error;
+                } else if (error.name === 'TypeError' && error.message.includes('fetch')) {
+                    throw new APIError(0, 'Network connection failed. Please check your internet connection.', null);
+                } else {
+                    throw new APIError(500, 'An unexpected error occurred. Please try again.', error);
+                }
+            }
+        }
+        
+        class APIError extends Error {
+            constructor(status, message, data) {
+                super(message);
+                this.name = 'APIError';
+                this.status = status;
+                this.data = data;
+            }
+            
+            getActionableMessage() {
+                const statusMessages = {
+                    400: 'Please check your input and try again.',
+                    401: 'Authentication failed. Please refresh the page.',
+                    403: 'You don\'t have permission to perform this action.',
+                    404: 'The requested resource was not found.',
+                    408: 'Request timed out. The AI service might be busy - please try again.',
+                    429: 'Too many requests. Please wait a moment before trying again.',
+                    500: 'Server error. Please try again in a few minutes.',
+                    502: 'Service temporarily unavailable. Please try again.',
+                    503: 'Service maintenance in progress. Please try again later.'
+                };
+                
+                return statusMessages[this.status] || 'An unexpected error occurred. Please try again.';
+            }
+        }
+        
+        // Enhanced campaign creation with better error handling
+        async function createCampaignWithErrorHandling(formData) {
+            try {
+                showNotification('🚀 Creating your campaign...', 'info', 2000);
+                
+                const result = await apiCall('/campaigns/create', {
+                    method: 'POST',
+                    body: JSON.stringify(formData)
+                });
+                
+                showNotification(`✅ Campaign "${formData.name}" created successfully! AI content generated and campaign is launching.`, 'success');
+                await refreshDashboard();
+                return result;
+                
+            } catch (error) {
+                console.error('Campaign creation error:', error);
+                
+                if (error instanceof APIError) {
+                    if (error.status === 408) {
+                        showNotification(`⏱️ Campaign creation is taking longer than expected. This is normal for complex campaigns. ${error.getActionableMessage()}`, 'warning', 8000);
+                    } else if (error.status === 402) {
+                        showNotification(`💳 AI service quota exceeded. Please check your OpenRouter credits or try again later. ${error.getActionableMessage()}`, 'error', 10000);
+                    } else if (error.status === 401) {
+                        showNotification(`🔑 Authentication error. Please check your API keys in the settings. ${error.getActionableMessage()}`, 'error', 10000);
+                    } else {
+                        showNotification(`❌ Campaign creation failed: ${error.message}. ${error.getActionableMessage()}`, 'error', 8000);
+                    }
+                } else {
+                    showNotification(`❌ Unexpected error: ${error.message}. Please try again or contact support.`, 'error');
+                }
+                
+                throw error;
+            }
+        }
+
+        // Export Reports Functionality
+        async function exportReports() {
+            try {
+                showNotification('📊 Preparing export...', 'info', 2000);
+                
+                const data = await apiCall('/dashboard');
+                const exportData = {
+                    generated_at: new Date().toISOString(),
+                    summary: data.summary_metrics,
+                    campaigns: data.active_campaigns,
+                    performance_overview: {
+                        total_campaigns: data.total_campaigns,
+                        total_spend: data.summary_metrics?.total_spend || 0,
+                        avg_ctr: data.summary_metrics?.avg_ctr || 0,
+                        avg_roas: data.summary_metrics?.avg_roas || 0
+                    }
+                };
+                
+                // Show export options modal
+                showExportModal(exportData);
+                
+            } catch (error) {
+                showNotification('❌ Failed to prepare export data', 'error');
+            }
+        }
+        
+        function showExportModal(data) {
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4';
+            modal.innerHTML = `
+                <div class="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+                    <h3 class="text-xl font-semibold text-gray-900 mb-4">📊 Export Reports</h3>
+                    <p class="text-gray-600 mb-6">Choose your preferred export format:</p>
+                    
+                    <div class="space-y-3">
+                        <button onclick="exportAsCSV(${JSON.stringify(data).replace(/"/g, '&quot;')}); this.closest('.fixed').remove();" 
+                                class="w-full bg-green-500 text-white p-3 rounded-lg hover:bg-green-600 transition-all touch-target">
+                            📋 Export as CSV
+                            <div class="text-sm opacity-75">Campaign data in spreadsheet format</div>
+                        </button>
+                        
+                        <button onclick="exportAsJSON(${JSON.stringify(data).replace(/"/g, '&quot;')}); this.closest('.fixed').remove();" 
+                                class="w-full bg-blue-500 text-white p-3 rounded-lg hover:bg-blue-600 transition-all touch-target">
+                            🔧 Export as JSON
+                            <div class="text-sm opacity-75">Raw data for developers</div>
+                        </button>
+                        
+                        <button onclick="generatePDFReport(${JSON.stringify(data).replace(/"/g, '&quot;')}); this.closest('.fixed').remove();" 
+                                class="w-full bg-purple-500 text-white p-3 rounded-lg hover:bg-purple-600 transition-all touch-target">
+                            📄 Generate PDF Report
+                            <div class="text-sm opacity-75">Professional summary report</div>
+                        </button>
+                    </div>
+                    
+                    <div class="mt-6 flex justify-end space-x-3">
+                        <button onclick="this.closest('.fixed').remove()" 
+                                class="px-4 py-2 text-gray-600 hover:text-gray-800 transition-all">
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            
+            // Close on click outside
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) modal.remove();
+            });
+        }
+        
+        function exportAsCSV(data) {
+            try {
+                const campaigns = data.campaigns || [];
+                if (campaigns.length === 0) {
+                    showNotification('❌ No campaigns to export', 'warning');
+                    return;
+                }
+                
+                // CSV headers
+                const headers = [
+                    'Campaign Name', 'Product Name', 'Platform', 'Status', 
+                    'Daily Budget', 'Total Spend', 'CTR (%)', 'CPC ($)', 'ROAS',
+                    'Created Date', 'Objective', 'AI Generated Headlines'
+                ];
+                
+                // CSV rows
+                const rows = campaigns.map(campaign => [
+                    campaign.name || '',
+                    campaign.product_name || '',
+                    campaign.platform || '',
+                    campaign.status || '',
+                    campaign.budget_daily || 0,
+                    campaign.metrics?.total_spend || 0,
+                    ((campaign.metrics?.avg_ctr || 0) * 100).toFixed(2),
+                    (campaign.metrics?.avg_cpc || 0).toFixed(2),
+                    (campaign.metrics?.avg_roas || 0).toFixed(2),
+                    campaign.created_at ? new Date(campaign.created_at).toLocaleDateString() : '',
+                    campaign.objective || '',
+                    campaign.ai_content?.headlines?.join('; ') || ''
+                ]);
+                
+                // Create CSV content
+                const csvContent = [headers, ...rows]
+                    .map(row => row.map(cell => `"${cell}"`).join(','))
+                    .join('\n');
+                
+                // Download
+                downloadFile(csvContent, 'marketing-campaigns-export.csv', 'text/csv');
+                showNotification('✅ CSV export downloaded successfully!', 'success');
+                
+            } catch (error) {
+                showNotification('❌ Failed to generate CSV export', 'error');
+            }
+        }
+        
+        function exportAsJSON(data) {
+            try {
+                const jsonContent = JSON.stringify(data, null, 2);
+                downloadFile(jsonContent, 'marketing-campaigns-export.json', 'application/json');
+                showNotification('✅ JSON export downloaded successfully!', 'success');
+            } catch (error) {
+                showNotification('❌ Failed to generate JSON export', 'error');
+            }
+        }
+        
+        function generatePDFReport(data) {
+            try {
+                // Create HTML report
+                const reportHTML = `
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <title>Marketing Campaign Report</title>
+                        <style>
+                            body { font-family: Arial, sans-serif; line-height: 1.6; margin: 20px; }
+                            .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 30px; }
+                            .summary { background: #f5f5f5; padding: 20px; border-radius: 8px; margin-bottom: 30px; }
+                            .campaign { border: 1px solid #ddd; margin-bottom: 20px; padding: 15px; border-radius: 5px; }
+                            .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; }
+                            .metric { text-align: center; padding: 10px; background: #f9f9f9; border-radius: 5px; }
+                            h1, h2, h3 { color: #333; }
+                            .date { color: #666; font-size: 14px; }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="header">
+                            <h1>🤖 Marketing Agent Campaign Report</h1>
+                            <p class="date">Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}</p>
+                        </div>
+                        
+                        <div class="summary">
+                            <h2>📊 Performance Summary</h2>
+                            <div class="metrics">
+                                <div class="metric">
+                                    <h3>${data.performance_overview.total_campaigns}</h3>
+                                    <p>Total Campaigns</p>
+                                </div>
+                                <div class="metric">
+                                    <h3>$${(data.performance_overview.total_spend || 0).toFixed(2)}</h3>
+                                    <p>Total Spend</p>
+                                </div>
+                                <div class="metric">
+                                    <h3>${((data.performance_overview.avg_ctr || 0) * 100).toFixed(2)}%</h3>
+                                    <p>Average CTR</p>
+                                </div>
+                                <div class="metric">
+                                    <h3>${(data.performance_overview.avg_roas || 0).toFixed(2)}x</h3>
+                                    <p>Average ROAS</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <h2>🎯 Campaign Details</h2>
+                        ${(data.campaigns || []).map(campaign => `
+                            <div class="campaign">
+                                <h3>${campaign.name}</h3>
+                                <p><strong>Product:</strong> ${campaign.product_name || 'N/A'}</p>
+                                <p><strong>Platform:</strong> ${campaign.platform || 'N/A'}</p>
+                                <p><strong>Status:</strong> ${campaign.status || 'N/A'}</p>
+                                <p><strong>Daily Budget:</strong> $${campaign.budget_daily || 0}</p>
+                                <p><strong>AI Headlines:</strong> ${campaign.ai_content?.headlines?.join(', ') || 'None'}</p>
+                                <div class="metrics">
+                                    <div class="metric">
+                                        <h4>$${(campaign.metrics?.total_spend || 0).toFixed(2)}</h4>
+                                        <p>Total Spend</p>
+                                    </div>
+                                    <div class="metric">
+                                        <h4>${((campaign.metrics?.avg_ctr || 0) * 100).toFixed(2)}%</h4>
+                                        <p>CTR</p>
+                                    </div>
+                                    <div class="metric">
+                                        <h4>${(campaign.metrics?.avg_roas || 0).toFixed(2)}x</h4>
+                                        <p>ROAS</p>
+                                    </div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </body>
+                    </html>
+                `;
+                
+                downloadFile(reportHTML, 'marketing-campaign-report.html', 'text/html');
+                showNotification('✅ PDF-ready HTML report downloaded! Open in browser and print to PDF.', 'success', 8000);
+                
+            } catch (error) {
+                showNotification('❌ Failed to generate PDF report', 'error');
+            }
+        }
+        
+        function exportCampaigns() {
+            exportReports(); // Use the same export functionality
+        }
+        
+        function downloadFile(content, filename, mimeType) {
+            const blob = new Blob([content], { type: mimeType });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        }
+
+        function setupEventListeners() {
+            document.getElementById('campaign-form').addEventListener('submit', createCampaign);
+        }
+
+        function initializeChart() {
+            const ctx = document.getElementById('performanceChart').getContext('2d');
+            performanceChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['6h ago', '5h ago', '4h ago', '3h ago', '2h ago', '1h ago', 'Now'],
+                    datasets: [{
+                        label: 'CTR (%)',
+                        data: [1.2, 1.4, 1.8, 2.1, 1.9, 2.3, 2.1],
+                        borderColor: 'rgb(59, 130, 246)',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        tension: 0.4
+                    }, {
+                        label: 'ROAS',
+                        data: [2.1, 2.3, 2.8, 3.2, 3.0, 3.5, 3.3],
+                        borderColor: 'rgb(16, 185, 129)',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+        async function loadDashboardData() {
+            try {
+                console.log('🔄 Loading dashboard data...');
+                // Update system status
+                document.getElementById('system-status').innerHTML = '🟢 ONLINE';
+                
+                // Try to fetch dashboard data
+                const response = await fetch(`${API_BASE}/dashboard`);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('📊 Received dashboard data:', data);
+                    console.log('📋 Campaigns to display:', data.active_campaigns?.length || 0);
+                    
+                    updateDashboardMetrics(data);
+                    updateCampaignsList(data.active_campaigns || []);
+                    
+                    addSystemLog(`✅ Dashboard loaded: ${data.active_campaigns?.length || 0} campaigns`, 'green');
+                } else {
+                    console.warn('⚠️ API response not OK:', response.status);
+                    // Show demo data if API not available
+                    showDemoData();
+                }
+                
+            } catch (error) {
+                console.error('Dashboard load error:', error);
+                document.getElementById('system-status').innerHTML = '🟡 API OFFLINE';
+                showDemoData();
+                addSystemLog('⚠️ API connection failed, showing demo data', 'yellow');
+            }
+        }
+
+        function updateDashboardMetrics(data) {
+            console.log('📊 Updating dashboard metrics with:', data);
+            document.getElementById('active-campaigns').textContent = data.total_campaigns || 0;
+            document.getElementById('total-spend').textContent = `$${(data.summary_metrics?.total_spend || 0).toFixed(2)}`;
+            document.getElementById('avg-ctr').textContent = `${((data.summary_metrics?.avg_ctr || 0) * 100).toFixed(2)}%`;
+            document.getElementById('total-roas').textContent = (data.summary_metrics?.avg_roas || 0).toFixed(2);
+        }
+
+        function updateCampaignsList(campaigns) {
+            const container = document.getElementById('campaigns-list');
+            
+            console.log('🎯 Updating campaigns list with:', campaigns.length, 'campaigns');
+            console.log('📋 Campaigns data:', campaigns);
+            
+            if (!campaigns || campaigns.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-8 text-gray-500">
+                        <span class="text-4xl">📭</span>
+                        <p class="mt-2">No active campaigns</p>
+                        <p class="text-sm">Create your first campaign below!</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = campaigns.map(campaign => `
+                <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-all cursor-pointer campaign-card" 
+                     onclick="toggleCampaignDetails('${campaign.id}')">
+                    <div class="flex items-center justify-between mb-2">
+                        <h4 class="font-medium text-gray-900">${campaign.name}</h4>
+                        <div class="flex items-center space-x-2">
+                            <span class="px-2 py-1 text-xs rounded-full ${getStatusColor(campaign.status)}">
+                                ${campaign.status}
+                            </span>
+                            <button 
+                                class="text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full p-1 transition-all text-sm"
+                                onclick="event.stopPropagation(); deleteCampaign('${campaign.id}', '${campaign.name}')"
+                                title="Delete Campaign">
+                                🗑️
+                            </button>
+                        </div>
+                    </div>
+                    <div class="text-sm text-gray-600 mb-3">
+                        <div class="flex items-start space-x-4">
+                            <div class="flex-1">
+                                <p><strong>Platform:</strong> ${campaign.platform}</p>
+                                <p><strong>Budget:</strong> $${(campaign.budget_daily || 0)}/day</p>
+                                <p><strong>CTR:</strong> ${((campaign.metrics?.avg_ctr || 0) * 100).toFixed(2)}%</p>
+                                <p><strong>Spend:</strong> $${(campaign.metrics?.total_spend || 0).toFixed(2)}</p>
+                            </div>
+                            ${campaign.ai_content?.image_url ? `
+                                <div class="flex-shrink-0">
+                                    <img src="${campaign.ai_content.image_url}" 
+                                         alt="Campaign Preview" 
+                                         class="w-20 h-20 object-cover rounded-lg border cursor-pointer hover:border-blue-400 transition-all"
+                                         onclick="event.stopPropagation(); openImageModal('${campaign.ai_content.image_url}', '${campaign.name}')"
+                                         title="Click to view full size AI image">
+                                </div>
+                            ` : `
+                                <div class="flex-shrink-0 w-20 h-20 bg-gray-100 rounded-lg flex items-center justify-center">
+                                    <span class="text-gray-400 text-xs">No Image</span>
+                                </div>
+                            `}
+                        </div>
+                    </div>
+                    
+                    <!-- AI Generated Content (initially hidden) -->
+                    <div id="details-${campaign.id}" class="hidden border-t pt-3 mt-3">
+                        ${campaign.ai_content ? `
+                            <div class="bg-blue-50 p-3 rounded-lg">
+                                <h5 class="font-semibold text-blue-900 mb-2">🤖 AI-Generated Content</h5>
+                                
+                                ${campaign.ai_content.headline ? `
+                                    <div class="mb-2">
+                                        <span class="text-xs font-medium text-blue-700">HEADLINE:</span>
+                                        <p class="text-sm text-gray-700">${campaign.ai_content.headline}</p>
+                                    </div>
+                                ` : ''}
+                                
+                                ${campaign.ai_content.description ? `
+                                    <div class="mb-2">
+                                        <span class="text-xs font-medium text-blue-700">DESCRIPTION:</span>
+                                        <p class="text-sm text-gray-700">${campaign.ai_content.description}</p>
+                                    </div>
+                                ` : ''}
+                                
+                                ${campaign.ai_content.call_to_action ? `
+                                    <div class="mb-2">
+                                        <span class="text-xs font-medium text-blue-700">CALL-TO-ACTION:</span>
+                                        <p class="text-sm text-gray-700">${campaign.ai_content.call_to_action}</p>
+                                    </div>
+                                ` : ''}
+                                
+                                ${campaign.ai_content.image_url ? `
+                                    <div class="mb-4">
+                                        <span class="text-xs font-medium text-blue-700">🎨 AI-GENERATED IMAGE:</span>
+                                        <div class="mt-2 relative group">
+                                            <img src="${campaign.ai_content.image_url}" 
+                                                 alt="AI Generated Marketing Image" 
+                                                 class="w-48 h-48 object-cover rounded-lg border-2 border-gray-200 cursor-pointer hover:border-blue-400 transition-all shadow-md hover:shadow-lg"
+                                                 onclick="openImageModal('${campaign.ai_content.image_url}', '${campaign.name}')"
+                                                 title="Click to view full size">
+                                            <div class="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-10 transition-all rounded-lg flex items-center justify-center opacity-0 hover:opacity-100">
+                                                <span class="text-white font-medium text-sm">🔍 Click to enlarge</span>
+                                            </div>
+                                        </div>
+                                        <p class="text-xs text-gray-500 mt-1">Click image to view full size</p>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        ` : `
+                            <div class="bg-gray-50 p-3 rounded-lg">
+                                <p class="text-sm text-gray-500">No AI content available</p>
+                            </div>
+                        `}
+                    </div>
+                    
+                    <div class="mt-2 text-xs text-gray-400">
+                        Click to ${campaign.ai_content ? 'view AI content' : 'see details'} ↓
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        function toggleCampaignDetails(campaignId) {
+            const details = document.getElementById(`details-${campaignId}`);
+            if (details.classList.contains('hidden')) {
+                details.classList.remove('hidden');
+            } else {
+                details.classList.add('hidden');
+            }
+        }
+        
+        function openImageModal(imageUrl, campaignName) {
+            const modal = document.getElementById('imageModal');
+            const modalImage = document.getElementById('modalImage');
+            const modalTitle = document.getElementById('modalTitle');
+            
+            modalImage.src = imageUrl;
+            modalTitle.textContent = `AI Generated Image - ${campaignName}`;
+            modal.classList.remove('hidden');
+            
+            // Prevent body scroll when modal is open
+            document.body.style.overflow = 'hidden';
+        }
+        
+        function closeImageModal() {
+            const modal = document.getElementById('imageModal');
+            modal.classList.add('hidden');
+            
+            // Restore body scroll
+            document.body.style.overflow = 'auto';
+        }
+        
+        // Close modal when clicking outside the image
+        function handleModalClick(event) {
+            if (event.target.id === 'imageModal') {
+                closeImageModal();
+            }
+        }
+        
+        // Close modal with Escape key
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                closeImageModal();
+            }
+        });
+
+        async function deleteCampaign(campaignId, campaignName) {
+            // Show confirmation dialog
+            const confirmed = confirm(`⚠️ DELETE CAMPAIGN?\n\n"${campaignName}"\n\nThis will permanently delete:\n• Campaign data\n• AI-generated content\n• Performance metrics\n• All related records\n\nThis action cannot be undone!`);
+            
+            if (!confirmed) {
+                return;
+            }
+
+            try {
+                addSystemLog(`🗑️ Deleting campaign: ${campaignName}`, 'yellow');
+                
+                const response = await fetch(`${API_BASE}/campaigns/${campaignId}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    addSystemLog(`✅ Campaign deleted successfully: ${campaignName}`, 'green');
+                    
+                    // Refresh dashboard data immediately
+                    loadDashboardData();
+                } else {
+                    const error = await response.text();
+                    addSystemLog(`❌ Failed to delete campaign: ${error}`, 'red');
+                }
+            } catch (error) {
+                console.error('Campaign deletion error:', error);
+                addSystemLog(`❌ Network error: ${error.message}`, 'red');
+            }
+        }
+
+        function showDemoData() {
+            // Show demo metrics
+            document.getElementById('active-campaigns').textContent = '3';
+            document.getElementById('total-spend').textContent = '$247.83';
+            document.getElementById('avg-ctr').textContent = '2.14%';
+            document.getElementById('total-roas').textContent = '3.42';
+
+            // Show demo campaigns
+            const demoCampaigns = [
+                { name: 'Summer Sale', platform: 'meta', status: 'green', metrics: { avg_ctr: 0.023, total_spend: 89.50 } },
+                { name: 'New Product Launch', platform: 'google', status: 'yellow', metrics: { avg_ctr: 0.018, total_spend: 158.33 } },
+                { name: 'Holiday Special', platform: 'both', status: 'green', metrics: { avg_ctr: 0.025, total_spend: 0.00 } }
+            ];
+            
+            updateCampaignsList(demoCampaigns);
+        }
+
+        function getStatusColor(status) {
+            switch(status) {
+                case 'green': return 'bg-green-100 text-green-800';
+                case 'yellow': return 'bg-yellow-100 text-yellow-800';
+                case 'red': return 'bg-red-100 text-red-800';
+                default: return 'bg-gray-100 text-gray-800';
+            }
+        }
+
+        async function createCampaign(event) {
+            event.preventDefault();
+            console.log('🚀 CREATE CAMPAIGN TRIGGERED');
+            
+            // Show immediate feedback
+            const submitBtn = document.querySelector('#campaign-form button[type="submit"]');
+            if (submitBtn) {
+                submitBtn.textContent = '⏳ Creating...';
+                submitBtn.disabled = true;
+            }
+            
+            try {
+                console.log('📝 GETTING FORM DATA...');
+                
+                const formData = {
+            name: document.getElementById('campaign-name').value,
+            product_name: document.getElementById('product-name').value,
+            product_description: document.getElementById('product-description').value,
+            product_category: document.getElementById('product-category').value,
+            product_features: document.getElementById('product-features').value,
+            product_price: document.getElementById('product-price').value,
+            landing_url: document.getElementById('landing-url').value || 'https://example.com',
+            platform: document.getElementById('platform').value,
+            budget_daily: parseFloat(document.getElementById('daily-budget').value),
+            objective: document.getElementById('objective').value,
+            target_audience: {
+                age_range: document.getElementById('target-age').value,
+                gender: document.getElementById('target-gender').value,
+                income_level: document.getElementById('target-income').value,
+                interests: document.getElementById('target-interests').value,
+                description: document.getElementById('target-description').value
+            },
+            brand_tone: document.getElementById('brand-tone').value,
+            selling_points: document.getElementById('selling-points').value,
+            special_offers: document.getElementById('special-offers').value
+        };
+
+                if (!formData.name || !formData.product_name || !formData.product_description || !formData.budget_daily) {
+                    addSystemLog('❌ Please fill in all required fields (marked with *)', 'red');
+                    return;
+                }
+
+                console.log('📤 SUBMITTING CAMPAIGN:', formData);
+                addSystemLog('🚀 Creating campaign: ' + formData.name, 'blue');
+                
+                const response = await fetch('/campaigns/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                });
+                
+                const result = await response.json();
+                console.log('📥 CAMPAIGN RESULT:', result);
+                
+                if (result.success) {
+                    addSystemLog('✅ Campaign created successfully!', 'green');
+                    document.getElementById('campaign-form').reset();
+                    setTimeout(() => refreshDashboard(), 1000);
+                } else {
+                    throw new Error(result.error || 'Campaign creation failed');
+                }
+                
+            } catch (error) {
+                console.error('❌ CAMPAIGN CREATION ERROR:', error);
+                addSystemLog('❌ Campaign creation failed: ' + error.message, 'red');
+            } finally {
+                // Reset button
+                if (submitBtn) {
+                    submitBtn.textContent = '🚀 Create AI-Powered Campaign';
+                    submitBtn.disabled = false;
+                }
+            }
+        }
+
+        async function refreshDashboard() {
+            console.log('🔄 REFRESHING DASHBOARD NOW');
+            const btn = document.getElementById('refresh-btn');
+            if (btn) btn.innerHTML = '⏳ Refreshing...';
+            
+            try {
+                const response = await fetch('/dashboard');
+                const data = await response.json();
+                
+                console.log('📊 API DATA RECEIVED:', data);
+                console.log('📋 CAMPAIGNS COUNT:', data.active_campaigns?.length || 0);
+                
+                // Update metrics
+                document.getElementById('active-campaigns').textContent = data.total_campaigns || 0;
+                document.getElementById('total-spend').textContent = `$${(data.summary_metrics?.total_spend || 0).toFixed(2)}`;
+                document.getElementById('avg-ctr').textContent = `${((data.summary_metrics?.avg_ctr || 0) * 100).toFixed(2)}%`;
+                document.getElementById('total-roas').textContent = (data.summary_metrics?.avg_roas || 0).toFixed(2);
+                
+                // Update campaigns list
+                const campaigns = data.active_campaigns || [];
+                const container = document.getElementById('campaigns-list');
+                
+                if (campaigns.length === 0) {
+                    container.innerHTML = `
+                        <div class="text-center py-8 text-gray-500">
+                            <span class="text-4xl">📭</span>
+                            <p class="mt-2">No active campaigns</p>
+                            <p class="text-sm">Create your first campaign below!</p>
+                        </div>
+                    `;
+                } else {
+                    console.log('📋 RENDERING', campaigns.length, 'CAMPAIGNS');
+                    container.innerHTML = campaigns.map(campaign => `
+                        <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-all mb-4">
+                            <div class="flex items-center justify-between mb-2">
+                                <h4 class="font-medium text-gray-900">${campaign.name || 'Unnamed Campaign'}</h4>
+                                <div class="flex items-center space-x-2">
+                                    <span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">
+                                        ${campaign.status || 'active'}
+                                    </span>
+                                    <button onclick="deleteCampaign('${campaign.id}', '${campaign.name}')" 
+                                            class="text-red-500 hover:text-red-700 px-2 py-1 rounded">🗑️</button>
+                                </div>
+                            </div>
+                            <div class="text-sm text-gray-600 grid grid-cols-2 gap-4">
+                                <div>
+                                    <p><strong>Platform:</strong> ${campaign.platform || 'meta'}</p>
+                                    <p><strong>Product:</strong> ${campaign.product_name || 'N/A'}</p>
+                                    <p><strong>Budget:</strong> $${campaign.budget_daily || 0}/day</p>
+                                </div>
+                                <div>
+                                    <p><strong>CTR:</strong> ${(((campaign.performance_data?.ctr || 0) * 100)).toFixed(2)}%</p>
+                                    <p><strong>CPC:</strong> $${(campaign.performance_data?.cpc || 0).toFixed(2)}</p>
+                                    <p><strong>ROAS:</strong> ${(campaign.performance_data?.roas || 0).toFixed(2)}x</p>
+                                </div>
+                            </div>
+                            ${campaign.ai_content ? `
+                                <div class="mt-3 bg-blue-50 p-3 rounded">
+                                    <p class="text-xs font-semibold text-blue-700 mb-2">🤖 AI GENERATED CONTENT:</p>
+                                    
+                                    ${campaign.ai_content.headlines && campaign.ai_content.headlines.length > 0 ? `
+                                        <div class="mb-2">
+                                            <span class="text-xs font-medium text-blue-600">HEADLINES:</span>
+                                            <p class="text-sm text-gray-700">"${campaign.ai_content.headlines[0]}"</p>
+                                            ${campaign.ai_content.headlines.length > 1 ? `<p class="text-xs text-gray-500">+${campaign.ai_content.headlines.length - 1} more variants</p>` : ''}
+                                        </div>
+                                    ` : ''}
+                                    
+                                    ${campaign.ai_content.description ? `
+                                        <div class="mb-2">
+                                            <span class="text-xs font-medium text-blue-600">DESCRIPTION:</span>
+                                            <p class="text-sm text-gray-700">"${campaign.ai_content.description}"</p>
+                                        </div>
+                                    ` : ''}
+                                    
+                                    ${campaign.ai_content.call_to_action ? `
+                                        <div class="mb-2">
+                                            <span class="text-xs font-medium text-blue-600">CALL TO ACTION:</span>
+                                            <p class="text-sm text-gray-700">"${campaign.ai_content.call_to_action}"</p>
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            ` : ''}
+                            
+                            ${campaign.ai_content?.image_url ? `
+                                <div class="mt-3">
+                                    <img src="${campaign.ai_content.image_url}" 
+                                         class="w-full h-32 object-cover rounded cursor-pointer hover:opacity-80 transition-opacity" 
+                                         alt="AI Generated Campaign Image"
+                                         onclick="openImageModal('${campaign.ai_content.image_url}', '${campaign.name}')">
+                                </div>
+                            ` : ''}
+                        </div>
+                    `).join('');
+                }
+                
+                console.log('✅ DASHBOARD REFRESHED SUCCESSFULLY');
+                
+            } catch (error) {
+                console.error('❌ DASHBOARD REFRESH FAILED:', error);
+                document.getElementById('campaigns-list').innerHTML = `
+                    <div class="text-center py-8 text-red-500">
+                        <span class="text-4xl">❌</span>
+                        <p class="mt-2">Failed to load campaigns</p>
+                        <p class="text-sm">Error: ${error.message}</p>
+                    </div>
+                `;
+            } finally {
+                if (btn) btn.innerHTML = '🔄 Refresh';
+            }
+        }
+
+        function addSystemLog(message, type = 'gray') {
+            const logsContainer = document.getElementById('system-logs');
+            const timestamp = new Date().toLocaleString();
+            const colorClass = {
+                'green': 'text-green-600',
+                'blue': 'text-blue-600', 
+                'yellow': 'text-yellow-600',
+                'red': 'text-red-600',
+                'gray': 'text-gray-600'
+            }[type];
+            
+            const logEntry = document.createElement('div');
+            logEntry.className = colorClass;
+            logEntry.textContent = `[${timestamp}] ${message}`;
+            
+            logsContainer.appendChild(logEntry);
+            logsContainer.scrollTop = logsContainer.scrollHeight;
+
+            // Keep only last 50 log entries
+            while (logsContainer.children.length > 50) {
+                logsContainer.removeChild(logsContainer.firstChild);
+            }
+        }
+    </script>
+</body>
+</html> 

@@ -1,0 +1,155 @@
+# Google Cloud Run deployment configuration
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: marketing-agent
+  labels:
+    app: marketing-agent
+    version: v1
+  annotations:
+    run.googleapis.com/ingress: all
+    run.googleapis.com/execution-environment: gen2
+spec:
+  template:
+    metadata:
+      annotations:
+        # Scaling configuration
+        autoscaling.knative.dev/minScale: "1"
+        autoscaling.knative.dev/maxScale: "10"
+        run.googleapis.com/execution-environment: gen2
+        run.googleapis.com/cpu-throttling: "false"
+        
+        # Memory and CPU configuration
+        run.googleapis.com/memory: "4Gi"
+        run.googleapis.com/cpu: "2"
+        
+        # Network configuration
+        run.googleapis.com/vpc-access-connector: projects/YOUR_PROJECT_ID/locations/us-central1/connectors/marketing-agent-connector
+        run.googleapis.com/vpc-access-egress: private-ranges-only
+        
+    spec:
+      containerConcurrency: 100
+      timeoutSeconds: 3600
+      serviceAccountName: marketing-agent-sa@YOUR_PROJECT_ID.iam.gserviceaccount.com
+      
+      containers:
+      - name: marketing-agent
+        image: gcr.io/YOUR_PROJECT_ID/marketing-agent:latest
+        
+        ports:
+        - name: http1
+          containerPort: 8080
+          protocol: TCP
+        
+        # Environment variables (use Secret Manager in production)
+        env:
+        - name: ENVIRONMENT
+          value: "production"
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: OPENROUTER_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: marketing-agent-secrets
+              key: openrouter-api-key
+        - name: SUPABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: marketing-agent-secrets
+              key: supabase-url
+        - name: SUPABASE_KEY
+          valueFrom:
+            secretKeyRef:
+              name: marketing-agent-secrets
+              key: supabase-key
+        - name: META_ACCESS_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: marketing-agent-secrets
+              key: meta-access-token
+        - name: GOOGLE_ADS_DEVELOPER_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: marketing-agent-secrets
+              key: google-ads-developer-token
+        
+        # Resource limits
+        resources:
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+          requests:
+            memory: "2Gi"
+            cpu: "1000m"
+        
+        # Health checks
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 60
+          timeoutSeconds: 10
+          failureThreshold: 3
+        
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 5
+          
+        # Startup probe
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 30
+
+---
+# Cloud Scheduler jobs for automated tasks
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: scheduler-jobs
+data:
+  performance-tracking.yaml: |
+    name: marketing-agent-performance-tracking
+    description: "Hourly performance tracking for all campaigns"
+    schedule: "0 * * * *"  # Every hour
+    time_zone: "America/New_York"
+    http_target:
+      uri: "https://marketing-agent-YOUR_HASH-uc.a.run.app/campaigns/track"
+      http_method: POST
+      headers:
+        Content-Type: application/json
+      body: "{}"
+      oidc_token:
+        service_account_email: "marketing-agent-scheduler@YOUR_PROJECT_ID.iam.gserviceaccount.com"
+  
+  budget-monitoring.yaml: |
+    name: marketing-agent-budget-monitoring
+    description: "Budget monitoring for all campaigns"
+    schedule: "*/30 * * * *"  # Every 30 minutes
+    time_zone: "America/New_York"
+    http_target:
+      uri: "https://marketing-agent-YOUR_HASH-uc.a.run.app/budgets/check"
+      http_method: POST
+      headers:
+        Content-Type: application/json
+      body: "{}"
+      oidc_token:
+        service_account_email: "marketing-agent-scheduler@YOUR_PROJECT_ID.iam.gserviceaccount.com"
+
+---
+# Service Account for Cloud Run
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: marketing-agent-sa
+  annotations:
+    iam.gke.io/gcp-service-account: marketing-agent-sa@YOUR_PROJECT_ID.iam.gserviceaccount.com 

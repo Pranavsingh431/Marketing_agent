@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  marketing-agent:
+    build: 
+      context: .
+      dockerfile: Dockerfile.production
+    ports:
+      - "8080:8080"
+    environment:
+      - ENVIRONMENT=production
+      - LOG_LEVEL=INFO
+    env_file:
+      - .env
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: '2.0'
+        reservations:
+          memory: 2G
+          cpus: '1.0'
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - marketing-agent-network
+
+  # Optional: Local development database (if not using Supabase)
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: marketing_agent
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    networks:
+      - marketing-agent-network
+    profiles:
+      - local-db
+
+volumes:
+  postgres_data:
+
+networks:
+  marketing-agent-network:
+    driver: bridge
